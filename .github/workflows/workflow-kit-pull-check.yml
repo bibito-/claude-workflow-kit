@@ -50,14 +50,14 @@ jobs:
           if [ -n "$base_sha" ] && git -C "$KIT" fetch --depth=1 origin "$base_sha" -q 2>/dev/null; then
             ancestor_ok=1
           else
-            echo "::warning::共通祖先 (${base_sha:-none}) を取得できません。方向判別できないファイルは適用しません"
+            echo "::notice::共通祖先 (${base_sha:-none}) を取得できません。差分のあるファイルは適用せず警告します"
           fi
 
           # base(共通祖先) / kit / project の三方向比較で取り込み方向を決める。
           #   same       … 差分なし
           #   kit        … kit だけが変更 → 取り込む
           #   local      … project だけが変更 → 取り込まない（push を促す）
-          #   conflict   … 双方が変更 → 停止して人間に出す
+          #   conflict   … 双方が変更 → 適用せず報告する
           #   noancestor … 祖先不明 → 適用しない
           classify() {
             local p="$1" src="$KIT/$1"
@@ -106,7 +106,8 @@ jobs:
                 changed=1
                 ;;
               local)
-                echo "::warning::${path} はこのリポジトリ側が先行しています。巻き戻さず据え置きました。/workflow-kit-push で kit へ反映してください"
+                # local は定常状態（base は進む・対応不要）。warning は blocked=1 のものに限る。
+                echo "::notice::${path} はこのリポジトリ側が先行しています。巻き戻さず据え置きました。/workflow-kit-push で kit へ反映してください"
                 ;;
               conflict)
                 echo "::warning::${path} は kit とこのリポジトリの双方が変更しています。自動では解決できません。手動で確認してください"
@@ -135,7 +136,7 @@ jobs:
 
             if [[ "$path" == */ ]]; then
               src_dir="$KIT/${path}"
-              [ -d "$src_dir" ] || { echo "::warning::${path} が claude-workflow-kit に存在しません（スキップ）"; continue; }
+              [ -d "$src_dir" ] || { echo "::notice::${path} が claude-workflow-kit に存在しません（スキップ）"; continue; }
               while IFS= read -r -d '' src_file; do
                 apply_one "${src_file#$KIT/}"
               done < <(find "$src_dir" -type f -name '*.js' -print0)
@@ -143,7 +144,7 @@ jobs:
             fi
 
             if [ ! -f "$KIT/$path" ]; then
-              echo "::warning::${path} が claude-workflow-kit に存在しません（スキップ）"
+              echo "::notice::${path} が claude-workflow-kit に存在しません（スキップ）"
               continue
             fi
             apply_one "$path"
