@@ -81,6 +81,12 @@ git rev-parse HEAD origin/main
 
 コピー元プロジェクト側の `.claude/manifests/workflow-kit-base.txt` を読み、kit の `origin/main` SHA と比較する。
 
+```bash
+base_sha=$(cat .claude/manifests/workflow-kit-base.txt 2>/dev/null || echo "")
+```
+
+**ファイルが存在しない場合は不一致として扱う。** base SHA は配布対象外なので、core を導入した直後のプロジェクトには存在しない。エラーで停止させず、未同期とみなして pull に作らせる。
+
 不一致なら **push せずに終了し、先に `/workflow-kit-pull` を実行するよう案内する。**
 
 一致していれば Step 4 へ進む。
@@ -129,4 +135,4 @@ git -C ../claude-workflow-kit rev-parse HEAD
 
 ### Step 8: 完了報告
 
-push したコミットハッシュと、更新後の base SHA を報告する。ai-todo 側の `steering/current.md` への記録は不要（claude-workflow-kit 側の commit history が記録そのもの）。
+push したコミットハッシュと、更新後の base SHA を報告する。コピー元プロジェクト側の `steering/current.md` への記録は不要（claude-workflow-kit 側の commit history が記録そのもの）。

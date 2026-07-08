@@ -78,6 +78,8 @@ cp ../claude-workflow-kit/.claude/<path> .claude/<path>
 
 kit の `origin/main` SHA を `.claude/manifests/workflow-kit-base.txt` に1行で書き込む。
 
+ファイルが存在しなければ新規作成する。base SHA は配布対象外なので、core を導入した直後のプロジェクトには存在せず、この Step が唯一の生成契機になる。
+
 ```bash
 git -C ../claude-workflow-kit rev-parse origin/main
 ```
