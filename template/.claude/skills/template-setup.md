@@ -101,13 +101,16 @@ core の [index-setup.md](./index-setup.md) に従い、`.claude/agents/`・`.cl
 
 `/workflow-kit-pull` / `/workflow-kit-push` は core のスキルだが、commands/ 側のエントリは各プロジェクトが作る（`.claude/commands/<name>.md` から対応スキルを読ませる）。
 
-## Step 8: このスキル自身を削除して報告する
+## Step 8: このスキルとコマンドを削除して報告する
 
 ```bash
-rm .claude/skills/template-setup.md
+rm .claude/skills/template-setup.md .claude/commands/template-setup.md
 ```
 
-一度きりの手順書のため、完了後は残さない。最後にユーザーへ報告する:
+一度きりの手順書のため、完了後は残さない。スキル本体だけを消すと `/template-setup` の
+コマンドファイルが実体の無いスラッシュコマンドとして残るので、2ファイルとも消すこと。
+
+最後にユーザーへ報告する:
 
 - 生成した agent 定義の一覧
 - 意図的に空のまま残したプレースホルダ（`{{TEST_BOILERPLATE}}` 等）とその埋めどき
