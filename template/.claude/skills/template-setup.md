@@ -20,6 +20,7 @@
 | レイヤー構成 | `src/` 直下のディレクトリ構成、`package.json` の workspaces、ビルド設定（複数ランタイムに分かれているか） |
 | テストランナーと実行コマンド | `package.json` の `scripts` / `devDependencies`、`vitest.config.*`・`jest.config.*` 等 |
 | テストファイルの命名規則 | 既存テストファイルの実物（無ければランナーの既定） |
+| テストファイルの配置規約 | 既存テストの置き場所（テスト対象と同居か、専用のテストルート配下か）。無ければランナー・言語の慣習 |
 | パッケージマネージャ | lockfile（`pnpm-lock.yaml` / `package-lock.json` / `yarn.lock`） |
 | 型チェックコマンド | `package.json` の `scripts`、`tsconfig.json` の有無 |
 | 既存の rules | `.claude/docs/rules/` の中身 |
@@ -49,13 +50,14 @@
 - 複製後、**骨格ファイル（`impl-agent.md` / `review-agent.md`）は削除する**。残すと Claude が実在の agent として拾ってしまう
 - `typecheck-agent.md` は Step 1 で調べた型チェッカーの名前でリネームし、`{{TYPECHECK_AGENT}}` / `{{LANGUAGE}}` / `{{TYPECHECK_COMMAND}}` を埋める（TypeScript → `tsc-agent` / `pnpm tsc --noEmit`、Python → `mypy-agent` / `uv run mypy app`）。**型チェッカーを持たないスタックならファイルごと削除する**（その場合 `tdd-workflow.md` のレビュー表からも型チェック列を落とす）
 - `review-agent.md` の frontmatter にある `guard-review-agent-no-test-run.js` の hooks ブロックは**消さない**（review-agent のテスト実行を意図的にブロックする core の仕組み）
+- `{{LAYER_CHECKLIST}}` をレイヤーごとに埋める。コードベースを読み、そのレイヤーで守るべき構造上の約束（層をまたぐ依存の禁止・例外の漏れ・責務の置き場所など）を抽出する。判断できなければユーザーに確認する
 - 埋めたあと、ファイル中の HTML コメント（`<!-- ... -->` の指示文）は削除する
 - リポジトリの絶対パスをハードコードしない（`.claude/rules/agent-definition-guide.md`）
 
 ## Step 4: rules と skills を埋める
 
 - `.claude/rules/agent-delegation.md` … 委譲表を実際のレイヤーで埋める。`{{IMPL_PATHS}}` はレイヤーのパス列挙
-- `.claude/skills/tdd-workflow.md` … 委譲表・レビュー表・テストコマンド・テストファイル配置を埋める
+- `.claude/skills/tdd-workflow.md` … 委譲表・レビュー表・テストコマンドを埋める。`{{TEST_PLACEMENT}}` は Step 1 で調べたテストファイルの配置規約（と命名規則）で埋める
 
 `{{TEST_BOILERPLATE}}` と `{{FILE_PLACEMENT_TABLE}}` は**この時点で無理に埋めない**。テストの雛形は実物を1本通してから写経するのが正しく、机上で書くと嘘のボイラープレートが残る。プロジェクトにまだテストが無ければ「（最初のテストを書いたら、その実物をここに写す）」と明記して残す。
 
