@@ -5,7 +5,7 @@
 ## 前提
 
 - `scripts/scaffold.sh`（core）と `scripts/scaffold-template.sh`（骨格）の両方が実行済みであること
-- core 側の `documentation-guide` / `commit-guide` / `merge-gate` / `doc-push-agent` / `tsc-agent` / hooks が `.claude/` に存在すること
+- core 側の `documentation-guide` / `commit-guide` / `merge-gate` / `doc-push-agent` / hooks が `.claude/` に存在すること
 
 未実行なら先に scaffold を促して止まる。
 
@@ -41,11 +41,13 @@
 レイヤーごとに複製し、プレースホルダを埋める。
 
 ```
-.claude/agents/impl-agent.md    → <レイヤー名>-impl-agent.md  （レイヤー数だけ複製）
-.claude/agents/review-agent.md  → <レイヤー名>-review-agent.md（レイヤー数だけ複製）
+.claude/agents/impl-agent.md      → <レイヤー名>-impl-agent.md  （レイヤー数だけ複製）
+.claude/agents/review-agent.md    → <レイヤー名>-review-agent.md（レイヤー数だけ複製）
+.claude/agents/typecheck-agent.md → <型チェッカー名>-agent.md    （リネーム。1つだけ）
 ```
 
 - 複製後、**骨格ファイル（`impl-agent.md` / `review-agent.md`）は削除する**。残すと Claude が実在の agent として拾ってしまう
+- `typecheck-agent.md` は Step 1 で調べた型チェッカーの名前でリネームし、`{{TYPECHECK_AGENT}}` / `{{LANGUAGE}}` / `{{TYPECHECK_COMMAND}}` を埋める（TypeScript → `tsc-agent` / `pnpm tsc --noEmit`、Python → `mypy-agent` / `uv run mypy app`）。**型チェッカーを持たないスタックならファイルごと削除する**（その場合 `tdd-workflow.md` のレビュー表からも型チェック列を落とす）
 - `review-agent.md` の frontmatter にある `guard-review-agent-no-test-run.js` の hooks ブロックは**消さない**（review-agent のテスト実行を意図的にブロックする core の仕組み）
 - 埋めたあと、ファイル中の HTML コメント（`<!-- ... -->` の指示文）は削除する
 - リポジトリの絶対パスをハードコードしない（`.claude/rules/agent-definition-guide.md`）

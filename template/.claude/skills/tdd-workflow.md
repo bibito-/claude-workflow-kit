@@ -136,17 +136,17 @@ Refactor 完了後、PR 作成前に必ず review-agent と型チェック Agent
 
 ### レビューの起動
 
-実装が完了したレイヤーから順次 review-agent を起動する。同時に `tsc-agent`（TypeScript プロジェクトの場合）も並行起動する。複数レイヤーにまたがる場合は全実装の完了を待たず、先に終わった方から即レビューを開始する。
+実装が完了したレイヤーから順次 review-agent を起動する。同時に `{{TYPECHECK_AGENT}}`（型チェッカーを持つスタックの場合）も並行起動する。複数レイヤーにまたがる場合は全実装の完了を待たず、先に終わった方から即レビューを開始する。
 
 | 対象 | 起動する agent |
 |---|---|
-| {{LAYER_PATH}} | `{{LAYER}}-review-agent` + `tsc-agent`（並行） |
+| {{LAYER_PATH}} | `{{LAYER}}-review-agent` + `{{TYPECHECK_AGENT}}`（並行） |
 
-<!-- {{REVIEW_TABLE}} … レイヤーの数だけ行を増やす。型チェックを持たない言語なら tsc-agent の列を落とす -->
+<!-- {{REVIEW_TABLE}} … レイヤーの数だけ行を増やす。型チェッカーを持たないスタックなら列ごと落とし、typecheck-agent.md も削除する -->
 
 ```
 Agent(subagent_type: "{{LAYER}}-review-agent", ...)
-Agent(subagent_type: "tsc-agent")
+Agent(subagent_type: "{{TYPECHECK_AGENT}}")
 # ↑ 両方完了後に分岐判定
 ```
 
