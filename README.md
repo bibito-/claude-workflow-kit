@@ -10,7 +10,7 @@ Claude Code と協業する TDD・spec/docs・review の開発ワークフロー
 
 | 種別 | 内容 | 配布方針 |
 |---|---|---|
-| **core**（本リポジトリの `.claude/` に収録） | `.claude/hooks/`・`doc-push-agent`・`tsc-agent`・`agent-definition-guide`・`commit-guide`・`documentation-guide`・`grill-me`・`merge-gate`・`terminology-rules`・`spec-workflow`・`doc-push`・`index-setup`・`commands/spec` | 各利用プロジェクトが `workflow-kit-pull-check.yml`（日次 + 手動実行）で本リポジトリとの差分を検知し、自リポジトリへ反映する PR を自動発行する。マージはレビューの上で手動 |
+| **core**（本リポジトリの `.claude/` に収録） | `.claude/hooks/`・`doc-push-agent`・`agent-definition-guide`・`commit-guide`・`documentation-guide`・`grill-me`・`merge-gate`・`terminology-rules`・`spec-workflow`・`doc-push`・`index-setup`・`commands/spec` | 各利用プロジェクトが `workflow-kit-pull-check.yml`（日次 + 手動実行）で本リポジトリとの差分を検知し、自リポジトリへ反映する PR を自動発行する。マージはレビューの上で手動 |
 | **template**（本リポジトリの `template/` に収録） | impl-agent / review-agent / typecheck-agent 定義・`agent-delegation`・`tdd-workflow`・`commands/tdd`。**実物ではなく `{{PLACEHOLDER}}` 入りの骨格**（「形は普遍・中身がスタック依存」なものだけ）。typecheck-agent は型チェッカー名で埋めてリネームする（TypeScript なら `tsc-agent`、Python なら `mypy-agent`。型チェッカーが無いスタックでは削除） | プロジェクト新規作成時に `scripts/scaffold-template.sh` で一度だけ取り込み、`/template-setup` でスタックに合わせて埋める。以後は同期しない（書き換えを上書きしてしまうため）。base SHA もマニフェストも書かないので、構造的に CI の走査対象外になる |
 | **スタック固有 rules**（本リポジトリには非収録） | react/tanstack-query/supabase/ui 等の docs/rules・テストボイラープレートの実物 | 骨格化しても中身が全部消えて空ファイルになるだけなので template に含めない。各プロジェクトが自分のスタックに合わせて書く（kit が渡すのは「rules を `docs/rules/` に置き `INDEX.md` から引く」という置き場のルールだけ） |
 | **派生物**（本リポジトリには非収録） | 各フォルダの `INDEX.md` | フォルダ内容から導出される索引のため、リポジトリごとに内容が異なる。配布せず、各プロジェクトの doc-push フローが自前で生成・更新する（ルール本体は `documentation-guide` が core として配布） |
