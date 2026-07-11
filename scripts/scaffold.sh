@@ -46,6 +46,7 @@ echo
 
 mkdir -p \
   .claude/agents \
+  .claude/commands \
   .claude/docs/rules \
   .claude/hooks \
   .claude/manifests \
