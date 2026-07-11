@@ -1,6 +1,6 @@
 ---
 name: {{LAYER}}-review-agent
-description: {{LAYER}} レイヤーのレビュー専任エージェント。docs/rules/ のルールに照らして {{LAYER_PATH}} を静的レビューし、違反・改善点を報告する。
+description: {{LAYER}} レイヤーのレビュー専任エージェント。docs/rules/ のルールとレイヤー観点のチェックリストに照らして {{LAYER_PATH}} を静的レビューし、違反・改善点を報告する。
 model: sonnet
 tools: Bash, Read, Write, Edit
 permissionMode: bypassPermissions
@@ -54,6 +54,20 @@ frontmatter の hooks は core の `.claude/hooks/guard-review-agent-no-test-run
 <!--
 {{RULES_TABLE}} … このレイヤーのレビューで参照する `.claude/docs/rules/` の各ファイルと、そこから見るチェック観点を1行ずつ列挙する。
 対応する impl-agent の「実装前に必ず参照するドキュメント」と揃えること（実装が見るルールと、レビューが見るルールがずれると意味がない）。
+-->
+
+## レイヤー観点のチェックリスト
+
+`docs/rules/` が未整備の間は、以下のチェックリストをルールの代替として使う。
+
+{{LAYER_CHECKLIST}}
+
+<!--
+{{LAYER_CHECKLIST}} … このレイヤーで守るべき構造上の約束を箇条書きにする。
+例（API レイヤー）: ルーターに ORM クエリを直書きしていないか／ビジネスロジックが service 層に寄っているか
+／ドメイン層に HTTP 例外が漏れていないか。
+rules を書き起こしたら、その内容を `docs/rules/` へ移し、上の {{RULES_TABLE}} から引くようにする。
+このチェックリストは rules が揃うまでの繋ぎであり、rules と重複させて二重管理にしないこと。
 -->
 
 ## 出力先
