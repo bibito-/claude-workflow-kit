@@ -54,9 +54,12 @@ push 側のこの検証は誤操作を防ぐ第一関門であり、それ自体
 
 ```bash
 ls ../claude-workflow-kit 2>/dev/null || gh repo clone bibito-/claude-workflow-kit ../claude-workflow-kit
+git -C ../claude-workflow-kit config core.hooksPath .githooks
 ```
 
 `../claude-workflow-kit` は現在のプロジェクトルート（`git rev-parse --show-toplevel`）から見た兄弟ディレクトリ。固定の絶対パスにはしないこと。
+
+2行目は kit 側の Git-level `pre-push` を有効化する。値を同じ `.githooks` に設定し直すだけなので、新規 clone・既存 clone のどちらでも冪等である。
 
 ### Step 3: クローンの一致確認と base SHA 検証
 
