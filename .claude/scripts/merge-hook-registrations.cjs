@@ -31,11 +31,23 @@ if (!fs.existsSync(manifestPath)) {
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const registrations = manifest.registrations || [];
 
+let raw = '';
 let settings = {};
 if (fs.existsSync(settingsPath)) {
-  settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  raw = fs.readFileSync(settingsPath, 'utf8');
+  settings = JSON.parse(raw);
 }
 settings.hooks = settings.hooks || {};
+
+// 既存ファイルのインデント幅を踏襲する。JSON.stringify の既定値で書き戻すと、
+// 追記は1エントリなのにファイル全体が再インデントされ、diff が全面書き換えになって
+// レビュー不能になる。このスクリプトの契約は「不足分だけ足し、他には触れない」。
+//
+// なお1行に畳んであるオブジェクトは JSON の往復で展開される（書式情報が残らない）。
+// これは初回だけの正規化であり、意味は変わらない。
+const indentMatch = raw.match(/^([ \t]+)"/m);
+const indent = indentMatch ? indentMatch[1] : '  ';
+const trailingNewline = raw === '' || raw.endsWith('\n');
 
 // 登録済みかどうかは「command 文字列がそのフックのファイル名を含むか」で判定する。
 // $CLAUDE_PROJECT_DIR の展開形やクォートの流儀がプロジェクトごとに違うため、
@@ -84,6 +96,9 @@ if (checkOnly) {
   process.exit(1);
 }
 
-fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+fs.writeFileSync(
+  settingsPath,
+  JSON.stringify(settings, null, indent) + (trailingNewline ? '\n' : '')
+);
 console.log('settings.json に追記しました:');
 for (const a of added) console.log(`  - ${a}`);
