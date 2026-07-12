@@ -28,7 +28,7 @@ hono-auth-starter ├─ core の変更を都度 push ─→ claude-workflow-kit
 
 push 時にこの SHA が kit の `origin/main` と一致しなければ、このプロジェクトは kit の最新を取り込んでいない。そのまま push すると他プロジェクトが反映済みの変更を巻き戻す（ロストアップデート）。
 
-これは誤操作を防ぐためのガードであり、不正を防ぐものではない（`base.txt` を手で書き換えれば素通りする）。バイパス不能な強制は kit リポジトリ側の CI / branch protection でしか実現できない。
+push 側のこの検証は誤操作を防ぐ第一関門であり、それ自体は不正を防がない（`base.txt` を手で書き換えれば素通りする）。バイパス不能な強制は kit 側にある。kit の main は ruleset `protect-main`（bypass 空・PR 必須）で保護され、`kit-push-guard` CI が PR のコミットに埋めた `Workflow-Kit-Base:` トレーラを kit の main HEAD と照合する（2026-07-12 導入）。push 側の base SHA は、この**トレーラとして kit へ渡すための値**でもある。
 
 ## 呼び出し方
 
@@ -114,30 +114,48 @@ cp <path> ../claude-workflow-kit/<path>
 grep -rniE 'wrangler|cloudflare|supabase|\bhono\b' <コピーしたファイル>
 ```
 
-### Step 6: コミットして push する
+### Step 6: ブランチを切って PR を作る
 
-対象ファイルのみを `git add` する（他の未コミット変更を巻き込まない）。
+kit の main は ruleset `protect-main` で保護されており直 push できない。PR 経路で反映する。
+
+対象ファイルのみを `git add` する（他の未コミット変更を巻き込まない）。コミットには **`Workflow-Kit-Base:` トレーラ**を必ず含める。値は Step 3-b で一致を確認した base SHA（= kit の main HEAD）。kit 側の `kit-push-guard` がこれを main HEAD と照合し、欠落・不一致なら PR を落とす。
 
 ```bash
-git add .claude/<変更ファイルのみ列挙>
-git commit -m "<変更内容の要約（日本語）>"
-git push origin main
+cd ../claude-workflow-kit
+git switch -c kit-push/$(date +%Y%m%d)-<要約>
+git add <変更ファイルのみ列挙>
+git commit -m "$(cat <<'EOF'
+<変更内容の要約（日本語）>
+
+Workflow-Kit-Base: <base SHA>
+EOF
+)"
+git push -u origin kit-push/$(date +%Y%m%d)-<要約>
+gh pr create --base main --title "<変更内容の要約>" --body "core の同期"
 ```
 
-push 失敗（競合）の場合はエラーをそのまま報告する。
+追加行が禁止語（`wrangler|cloudflare|supabase|\bhono\b`）にヒットするが、それが**言及であって依存ではない**場合（禁止語パターンの定義そのもの・位置づけ図での consumer 列挙など）は、コミットに `Kit-Grep-Mention: <理由>` トレーラを足す。理由が空だと落ちる。これは例外を通す口ではなく「この語は言及であって依存ではない」と表明するもの。
 
-### Step 7: base SHA を更新する
+### Step 7: CI green を確認してマージを依頼する
 
-push 直後の claude-workflow-kit の HEAD SHA を取得し、コピー元プロジェクトの `.claude/manifests/workflow-kit-base.txt` に1行で書き戻す。
+`gh pr checks <PR番号>` で `kit-push-guard` が green になったことを確認する。
+
+**マージはユーザーが実行する。Claude はマージしない。** 事故の最終的な検知手段は「他人の変更を消す hunk が diff に見える」ことであり、自動マージするとその diff を誰も見ないまま通る。`gh pr merge <PR番号> --squash` をユーザーに依頼する。
+
+CI が赤い場合は、落ちた検査（鮮度 / 混入）と CI の出力をそのまま報告して終了する。勝手に base.txt を書き換えて通そうとしないこと。
+
+### Step 8: base SHA を更新する
+
+**マージ後に実行する。** 取得する SHA は「push 直後の HEAD」ではなく「**マージ後の kit の main HEAD**」なので、コピー元プロジェクトの `.claude/manifests/workflow-kit-base.txt` に書き戻す。
 
 ```bash
-git -C ../claude-workflow-kit rev-parse HEAD
+git -C ../claude-workflow-kit fetch origin main -q && git -C ../claude-workflow-kit rev-parse origin/main
 ```
 
 このファイルはコピー元プロジェクト側の `.claude/` 配下なので、コミット・push は doc-push-agent に委譲する（対象ファイルを明示列挙する）。
 
 これを忘れると次回 push が必ず弾かれる（base が古いままになるため）。
 
-### Step 8: 完了報告
+### Step 9: 完了報告
 
-push したコミットハッシュと、更新後の base SHA を報告する。コピー元プロジェクト側の `steering/current.md` への記録は不要（claude-workflow-kit 側の commit history が記録そのもの）。
+マージされた PR 番号と、更新後の base SHA を報告する。コピー元プロジェクト側の `steering/current.md` への記録は不要（claude-workflow-kit 側の commit history が記録そのもの）。
