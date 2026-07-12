@@ -71,6 +71,9 @@ for (const [event, groups] of Object.entries(settings.hooks)) {
     if (g.hooks !== undefined && !Array.isArray(g.hooks)) {
       fail(`settings.json の hooks.${event}[matcher=${g.matcher}].hooks が配列ではありません`);
     }
+    if (g.hooks && g.hooks.some((h) => !isPlainObject(h))) {
+      fail(`settings.json の hooks.${event}[matcher=${g.matcher}].hooks に非オブジェクトの要素があります`);
+    }
   }
 }
 
@@ -81,16 +84,78 @@ const indentMatch = raw.match(/^([ \t]+)"/m);
 const indent = indentMatch ? indentMatch[1] : '  ';
 const trailingNewline = raw === '' || raw.endsWith('\n');
 
-// 登録済み判定。コマンド文字列の完全一致では判定できない（$CLAUDE_PROJECT_DIR の
-// 展開形やクォートの流儀がプロジェクトごとに違う）。宣言されたリポジトリ相対パスが
-// コマンド中に現れ、かつその直後がパス構成文字でないことを見る。
+// 登録済み判定。単なるパス文字列の検索では、echo '.claude/hooks/...' のような
+// 表示専用コマンドまで登録済みと誤認する。そこで、単純な `node <引数...>` を最低限
+// 字句分割し、フックが独立した引数として node に渡る場合だけ登録済みとみなす。
 //
-// 単なるファイル名の部分文字列一致では緩すぎる。guard-rm-rf.js.disabled のような
-// 別ファイルや、コマンド文字列にファイル名を含むだけの無関係な登録にヒットする。
-const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const referencesHook = (command, hook) =>
-  typeof command === 'string' &&
-  new RegExp(`${escapeRegExp(hook)}(?![\\w.\\-/])`).test(command);
+// これは意図的に保守的である。シェルの複雑な構文、別のランナー、判別できないクォート
+// は未登録扱いにする。その場合は重複登録される可能性があるが、未登録なのに「不足なし」
+// と報告してゲートを入れ損なうより安全である。
+const splitShellWords = (command) => {
+  if (typeof command !== 'string') return null;
+
+  const words = [];
+  let word = '';
+  let quote = null;
+  let escaping = false;
+  let hasWord = false;
+
+  for (const char of command) {
+    if (escaping) {
+      word += char;
+      hasWord = true;
+      escaping = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaping = true;
+      hasWord = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      else word += char;
+      hasWord = true;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      hasWord = true;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (hasWord) {
+        words.push(word);
+        word = '';
+        hasWord = false;
+      }
+      continue;
+    }
+    // 演算子やリダイレクトを含むコマンドは、誤検出を避けるため判定しない。
+    if (';&|<>`()'.includes(char)) return null;
+    word += char;
+    hasWord = true;
+  }
+
+  if (quote || escaping) return null;
+  if (hasWord) words.push(word);
+  return words;
+};
+
+const referencesHook = (command, hook) => {
+  const words = splitShellWords(command);
+  if (!words || words[0] !== 'node') return false;
+  // `node -e '...hook path...'` はフックの実行ではなく、コード中の文字列かもしれない。
+  if (words.includes('-e') || words.includes('--eval')) return false;
+
+  const acceptedPaths = new Set([
+    hook,
+    `./${hook}`,
+    `$CLAUDE_PROJECT_DIR/${hook}`,
+    `\${CLAUDE_PROJECT_DIR}/${hook}`,
+  ]);
+  return words.slice(1).some((word) => acceptedPaths.has(word));
+};
 
 const added = [];
 
@@ -104,9 +169,11 @@ for (const reg of registrations) {
   // 登録済みかは「同じ event かつ同じ matcher のグループ」の中だけで判定する。
   // event 全体を走査すると、宣言が Write|Edit なのに同じ event の Bash に同名フックが
   // あるだけで「登録済み」と誤認し、必要な登録が永久に入らない。
-  const target = groups.find((g) => g.matcher === matcher);
-  const alreadyRegistered =
-    !!target && (target.hooks || []).some((h) => referencesHook(h.command, hook));
+  const matchingGroups = groups.filter((g) => g.matcher === matcher);
+  const target = matchingGroups[0];
+  const alreadyRegistered = matchingGroups.some((g) =>
+    (g.hooks || []).some((h) => referencesHook(h.command, hook))
+  );
   if (alreadyRegistered) continue;
 
   const entry = {
@@ -140,8 +207,10 @@ if (checkOnly) {
 // 一時ファイルへ書いてから rename する。原ファイルへ直接書くと、途中で I/O が
 // 失敗したときに settings.json が切り詰められた状態で残る。
 const tmpPath = `${settingsPath}.tmp-${process.pid}`;
+const existingMode = fs.existsSync(settingsPath) ? fs.statSync(settingsPath).mode & 0o7777 : null;
 try {
   fs.writeFileSync(tmpPath, JSON.stringify(settings, null, indent) + (trailingNewline ? '\n' : ''));
+  if (existingMode !== null) fs.chmodSync(tmpPath, existingMode);
   fs.renameSync(tmpPath, settingsPath);
 } catch (e) {
   try {
