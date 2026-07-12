@@ -1,0 +1,139 @@
+name: kit-push-guard
+
+# core の正（このリポジトリ）への PR を検査する。ruleset `protect-main` の
+# required status check として参照されるため、ジョブ ID は変更しないこと。
+#
+# 検査は2つ。
+#
+# 1. 鮮度: マニフェスト掲載ファイルに触れる PR は、HEAD コミットの
+#    `Workflow-Kit-Base:` トレーラ（push する側の base.txt の値）が
+#    このリポジトリの main HEAD と一致していること。
+#
+#    「PR ブランチが main に追随しているか」だけでは事故を検知できない。最新の
+#    main から切ったブランチに古いコピーを載せても祖先関係は最新のままで、
+#    他プロジェクトが反映済みの変更が静かに巻き戻る。押す側が「どの時点の kit を
+#    取り込んだ状態でコピーしたか」はトレーラでしか表明できない。
+#    トレーラ欠落 = push スキルを踏んでいない、も同時に弾ける。
+#
+#    マニフェスト外のファイル（README・このワークフロー自身・consumer へ配布
+#    しないもの）は丸ごとコピーされる経路が無く、ロストアップデートが起きない。
+#    そこまでトレーラを要求すると、bot が立てる自動 PR や通常の改修 PR が
+#    軒並みマージ不能になる。
+#
+# 2. 混入: 追加行にスタック固有語が無いこと。core はスタック非依存でなければ
+#    ならない。既存行は見ない（現行 core に正当なヒットが複数あり、ファイル全体の
+#    grep は初回から赤くなるため）。正当な追加（禁止語パターンの定義そのもの等）は
+#    HEAD コミットに `Kit-Grep-Mention: <理由>` を付けて宣言すると警告に降格する。
+#    「例外を通す」のではなく「この語は言及であって依存ではない」と表明するもの。
+#
+# このファイルはマニフェストに載せない（consumer へ配布しない）。実際に走るのは
+# kit リポジトリだけであり、配ると全 consumer が絶対に使わないワークフローを持つ。
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  kit-push-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          # 既定の checkout は main とのマージコミットを指す。トレーラは PR の
+          # HEAD コミットに付くので、明示的に head を取る。
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Guard
+        env:
+          TRAILER: Workflow-Kit-Base
+          MANIFEST: .claude/manifests/workflow-kit-files.txt
+          FORBIDDEN: 'wrangler|cloudflare|supabase|\bhono\b'
+        run: |
+          set -euo pipefail
+
+          git fetch origin main -q
+          main_sha=$(git rev-parse origin/main)
+          base_ref=$(git merge-base origin/main HEAD)
+          fail=0
+
+          if [ ! -f "$MANIFEST" ]; then
+            echo "::error::$MANIFEST が見つかりません"
+            exit 1
+          fi
+
+          # マニフェストの行は「1行1パス」。末尾が / の行はそのディレクトリ配下を
+          # 再帰対象とする（pull ワークフローと同じ解釈）。
+          in_manifest() {
+            local p="$1" entry
+            while IFS= read -r entry; do
+              [ -z "$entry" ] && continue
+              case "$entry" in
+                */) case "$p" in "$entry"*) return 0 ;; esac ;;
+                *)  [ "$p" = "$entry" ] && return 0 ;;
+              esac
+            done < "$MANIFEST"
+            return 1
+          }
+
+          # ---- 1. 鮮度 ----
+          touches_manifest=0
+          while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            if in_manifest "$p"; then
+              echo "配布対象ファイルの変更: $p"
+              touches_manifest=1
+            fi
+          done < <(git diff --name-only "$base_ref" HEAD)
+
+          if [ "$touches_manifest" = "1" ]; then
+            declared=$(git log -1 --format="%(trailers:key=$TRAILER,valueonly)" HEAD | tr -d '[:space:]')
+            if [ -z "$declared" ]; then
+              echo "::error::配布対象ファイルを変更する PR には $TRAILER トレーラが必要です。push スキル経由でコミットしてください"
+              fail=1
+            else
+              resolved=$(git rev-parse --verify --quiet "${declared}^{commit}" || true)
+              if [ "$resolved" != "$main_sha" ]; then
+                echo "::error::$TRAILER: $declared は main HEAD ($main_sha) と一致しません。古い base からのコピーで他プロジェクトの変更を巻き戻す恐れがあります。kit を pull し直してからやり直してください"
+                fail=1
+              else
+                echo "鮮度 OK: $TRAILER = $declared (= main HEAD)"
+              fi
+            fi
+          else
+            echo "配布対象ファイルの変更なし。鮮度チェックをスキップします"
+          fi
+
+          # ---- 2. 混入 ----
+          # 追加行の抽出に grep を挟むと、パターン不正による異常終了 (exit 2) と
+          # 「一致なし」(exit 1) を呼び出し側で区別できず、`|| true` が検査そのものの
+          # 失敗を握り潰す。抽出は awk で行い、grep は照合だけに使って exit 2 を弾く。
+          added=$(git diff "$base_ref" HEAD | awk '/^\+\+\+/ { next } /^\+/ { print }')
+
+          hits=""
+          if [ -n "$added" ]; then
+            set +e
+            hits=$(printf '%s\n' "$added" | grep -inE "$FORBIDDEN")
+            rc=$?
+            set -e
+            if [ "$rc" -gt 1 ]; then
+              echo "::error::禁止語の grep が異常終了しました (exit $rc)。FORBIDDEN パターンを確認してください"
+              exit 1
+            fi
+          fi
+
+          if [ -n "$hits" ]; then
+            mention=$(git log -1 --format='%(trailers:key=Kit-Grep-Mention,valueonly)' HEAD | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            printf '%s\n' "$hits"
+            if [ -z "$mention" ]; then
+              echo "::error::追加行にスタック固有語が含まれます。core はスタック非依存でなければなりません。言及であって依存ではない場合は HEAD コミットに 'Kit-Grep-Mention: <理由>' トレーラを付けてください"
+              fail=1
+            else
+              echo "::warning::追加行にスタック固有語がありますが Kit-Grep-Mention により通します: $mention"
+            fi
+          else
+            echo "混入 OK: 追加行に禁止語なし"
+          fi
+
+          exit "$fail"
