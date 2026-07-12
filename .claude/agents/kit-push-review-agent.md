@@ -64,7 +64,7 @@ git -C <kit_path> ls-files --others --exclude-standard
 
 ### Step 6: verdict ファイルの作成と出力
 
-審査結果を verdict ファイルに記録。ファイルパスは `.claude/steering/reviews/<YYYY-MM-DD>-<HHmm>-kit-push-<layer>.md`。`<HHmm>` は `date +"%H%M"` で現在時刻を秒なし形式で取得。
+審査結果を、引数 `kit_path` で渡された kit クローン内の verdict ファイルに記録。ファイルパスは `<kit_path>/.claude/steering/reviews/<YYYY-MM-DD>-<HHmm>-kit-push-<layer>.md`。`<HHmm>` は `date +"%H%M"` で現在時刻を秒なし形式で取得。
 
 **frontmatter**（YAML）:
 - `verdict`: `clean` または `contaminated`

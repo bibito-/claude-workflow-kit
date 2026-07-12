@@ -207,8 +207,10 @@ function classifyPushCommand(cmd, cwd, nesting = 0) {
   return { kind: 'not-push' };
 }
 
-function findCleanVerdict(kitPath, layerName, currentDigest, projectDir) {
-  const reviewDir = path.join(projectDir, '.claude', 'steering', 'reviews');
+function findCleanVerdict(kitPath, layerName, currentDigest) {
+  // verdict は対象の kit 作業ツリーだけに置く。Claude Code の環境変数に依存すると、
+  // Bash hook と Git の pre-push hook で探索先が分かれてしまう。
+  const reviewDir = path.join(kitPath, '.claude', 'steering', 'reviews');
   const targetRepo = path.basename(kitPath);
 
   if (!fs.existsSync(reviewDir)) return false;
@@ -246,7 +248,7 @@ function findCleanVerdict(kitPath, layerName, currentDigest, projectDir) {
   return false;
 }
 
-function enforcePushVerdict(kitPath, projectDir) {
+function enforcePushVerdict(kitPath) {
   const layerName = resolveLayer(kitPath);
   if (!layerName) return true;
 
@@ -258,7 +260,7 @@ function enforcePushVerdict(kitPath, projectDir) {
     return false;
   }
 
-  if (!findCleanVerdict(kitPath, layerName, currentDigest, projectDir)) {
+  if (!findCleanVerdict(kitPath, layerName, currentDigest)) {
     console.error(
       'kit への push には kit-push-review-agent による clean verdict が必要です。/kit-push で agent を起動してレビューを受けてください。（digest 不一致の場合はレビュー後にファイルが変更されています）'
     );
@@ -292,11 +294,10 @@ if (require.main === module) {
   }
 
 // モード2: git の pre-push フック。Bash 文字列の解析に依存せず、git が起動する
-// たびに同じ verdict を検証する。CLAUDE_PROJECT_DIR が無い通常の git 実行では
-// kit 自身を verdict の保管場所として使い、見つからなければ fail closed する。
+// たびに kit 作業ツリー内の同じ verdict を検証する。
   if (process.argv[2] === '--pre-push') {
     const kitPath = process.argv[3] || process.cwd();
-    process.exit(enforcePushVerdict(kitPath, process.env.CLAUDE_PROJECT_DIR || kitPath) ? 0 : 2);
+    process.exit(enforcePushVerdict(kitPath) ? 0 : 2);
   }
 
 // モード3: Claude Code の Bash matcher。git の pre-push より前の防御層。
@@ -349,7 +350,7 @@ if (require.main === module) {
       kitPath = path.resolve(cwd, kitPath);
     }
 
-    process.exit(enforcePushVerdict(kitPath, process.env.CLAUDE_PROJECT_DIR || kitPath) ? 0 : 2);
+    process.exit(enforcePushVerdict(kitPath) ? 0 : 2);
   });
 }
 
