@@ -29,10 +29,13 @@ const REVIEW_SCOPE_FILE = '.kit-push-review-scope.json';
 // どの kit にも同じ役割で存在し、宣言の有無にかかわらず必ず審査するもの。個別の kit の
 // 宣言漏れでゲートが外れないよう、宣言ファイルではなくここに持つ。
 // （層固有の語彙ではなく、kit という構造そのものが持つ役割の名前である）
+// README は入れない。概要と最小限の用法に留めるべきもので、設計文書ではなく配布もされない。
+// 大袈裟な審査を通さずとも誤りが分かる程度にコンパクトに保つのが正しく、審査コストを払うなら
+// 中身を docs/ に置いて README からは参照する。CLAUDE.md は Claude への指示書であり、実装と
+// ずれると挙動そのものが変わるため入れる。
 const MANDATORY_SCOPE = [
   REVIEW_SCOPE_FILE, // 縮められると審査そのものを外せる
-  'README.md', // kit の使い方・境界を定める正典
-  'CLAUDE.md', // 同上
+  'CLAUDE.md', // Claude への指示書。ずれると挙動が変わる
   '.github/', // ゲート定義（CI）
   '.githooks/', // ゲート定義（pre-push）
   'template/', // scaffold で外へ出る骨格
