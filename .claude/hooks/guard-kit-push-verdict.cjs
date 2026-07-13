@@ -21,8 +21,23 @@ const { execSync } = require('child_process');
 //   - kit の使い方・境界を定める正典（README・CLAUDE.md）。配布はされないが、
 //     ここが誤ると以後の判断すべてが誤る
 //
-// 存在しなければスコープ = マニフェストのみ。
+// **宣言ファイルが無ければ全変更を審査する。** このフックは配布されるが宣言ファイルは
+// 配布されない。「無ければマニフェストだけ見る」にすると、宣言を持たない配布先の kit で
+// template/ や正典が無審査で外へ出る。宣言し忘れは安全側（審査過剰）に倒すこと。
 const REVIEW_SCOPE_FILE = '.kit-push-review-scope.json';
+
+// どの kit にも同じ役割で存在し、宣言の有無にかかわらず必ず審査するもの。個別の kit の
+// 宣言漏れでゲートが外れないよう、宣言ファイルではなくここに持つ。
+// （層固有の語彙ではなく、kit という構造そのものが持つ役割の名前である）
+const MANDATORY_SCOPE = [
+  REVIEW_SCOPE_FILE, // 縮められると審査そのものを外せる
+  'README.md', // kit の使い方・境界を定める正典
+  'CLAUDE.md', // 同上
+  '.github/', // ゲート定義（CI）
+  '.githooks/', // ゲート定義（pre-push）
+  'template/', // scaffold で外へ出る骨格
+  'scripts/', // scaffold スクリプト本体。汚染が生成物すべてに焼き付く
+];
 
 // マーカー規則で層を判定する関数。kit かどうかの判定も含む。
 // 層が判定できたら層名を返す、できなければ null を返す。
@@ -99,10 +114,11 @@ function loadManifestPaths(kitPath) {
   return paths;
 }
 
-// マニフェスト外で審査すべきパスの宣言を読む。無ければ空。
+// マニフェスト外で審査すべきパスの宣言を読む。宣言ファイルが無ければ null を返す
+// （空配列ではない。「宣言が無い」と「宣言が空」を呼び出し側で区別するため）。
 function loadScopeExtras(kitPath) {
   const scopePath = path.join(kitPath, REVIEW_SCOPE_FILE);
-  if (!fs.existsSync(scopePath)) return [];
+  if (!fs.existsSync(scopePath)) return null;
 
   let config;
   try {
@@ -133,13 +149,15 @@ function loadScopeExtras(kitPath) {
 
 // 今回の変更のうち、実際に審査すべきパス。空なら審査は不要。
 //
-// scope 宣言ファイル自身は常にスコープ内。ここを書き換えると「何を審査するか」が変わる
-// ため、無審査で縮められると審査そのものを外せてしまう。
+// 宣言ファイルが無い kit では絞り込まない。スコープを狭めるのは、狭めてよい範囲を
+// 明示的に宣言した kit だけの特典である。宣言していない kit で黙って狭めると、
+// このフックが配布された先で審査が外れる。
 function getReviewPaths(kitPath, changedPaths = getChangedPaths(kitPath)) {
-  const scope = [REVIEW_SCOPE_FILE, ...loadManifestPaths(kitPath), ...loadScopeExtras(kitPath)];
-  return changedPaths.filter((changedPath) =>
-    scope.some((entry) => covers(entry, changedPath))
-  );
+  const extras = loadScopeExtras(kitPath);
+  if (extras === null) return changedPaths;
+
+  const scope = [...MANDATORY_SCOPE, ...loadManifestPaths(kitPath), ...extras];
+  return changedPaths.filter((changedPath) => scope.some((entry) => covers(entry, changedPath)));
 }
 
 // digest 計算関数。agent とフックで同一ロジックを保証するため
