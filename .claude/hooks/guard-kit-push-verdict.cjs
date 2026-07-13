@@ -64,6 +64,31 @@ function getChangedPaths(kitPath) {
   return [...new Set([...changed, ...untracked])].sort();
 }
 
+// マニフェストの行は「1行1パス」。末尾 / の行はそのディレクトリ配下を再帰対象とする。
+// 免除リストと同じ規則なので、被覆判定を両者で共有する。
+function covers(entry, target) {
+  return entry.endsWith('/') ? target.startsWith(entry) : target === entry;
+}
+
+// この kit が配布するパスを全マニフェストから集める。層は問わない。kit は自層の正で
+// あると同時に上位層の consumer でもあり、どちらのペイロードも免除の網から外れては
+// ならない。
+function loadDistributedPaths(kitPath) {
+  const manifestDir = path.join(kitPath, '.claude', 'manifests');
+  if (!fs.existsSync(manifestDir)) return [];
+
+  const paths = [];
+  for (const file of fs.readdirSync(manifestDir)) {
+    if (!/-kit-files\.txt$/.test(file)) continue;
+    const lines = fs.readFileSync(path.join(manifestDir, file), 'utf8').split('\n');
+    for (const line of lines) {
+      const entry = line.trim();
+      if (entry) paths.push(entry);
+    }
+  }
+  return paths;
+}
+
 function loadReviewExemptions(kitPath) {
   const exemptionsPath = path.join(kitPath, REVIEW_EXEMPTIONS_FILE);
   if (!fs.existsSync(exemptionsPath)) return [];
@@ -79,6 +104,8 @@ function loadReviewExemptions(kitPath) {
     throw new Error(`${REVIEW_EXEMPTIONS_FILE} は version: 1 と paths 配列を持つ必要があります`);
   }
 
+  const distributed = loadDistributedPaths(kitPath);
+
   return config.paths.map((entry, index) => {
     if (
       !entry ||
@@ -91,6 +118,21 @@ function loadReviewExemptions(kitPath) {
     ) {
       throw new Error(`${REVIEW_EXEMPTIONS_FILE} の paths[${index}] が不正です`);
     }
+
+    // 免除できるのは配布されないパスだけ。混入審査が守るのは配布ペイロードであり、
+    // 配布対象を免除した時点で審査は素通りになる。どちらがどちらを覆っていても
+    // 危険なので双方向で見る（`.claude/docs/` が配布物 `.claude/docs/rules/x.md` を
+    // 覆う場合と、配布ディレクトリ `.claude/hooks/` が免除対象の1ファイルを覆う場合）。
+    // 免除リストの書き間違いを人間の注意力に頼らせないための構造的な歯止め。
+    const conflict = distributed.find(
+      (dist) => covers(entry.path, dist) || covers(dist, entry.path)
+    );
+    if (conflict) {
+      throw new Error(
+        `${REVIEW_EXEMPTIONS_FILE} の paths[${index}] "${entry.path}" は配布対象 "${conflict}" と重なっています。配布されるファイルは審査を免除できません`
+      );
+    }
+
     return entry.path;
   });
 }
@@ -102,9 +144,7 @@ function areAllChangesReviewExempt(kitPath, changedPaths) {
   const exemptions = loadReviewExemptions(kitPath);
   return changedPaths.every((changedPath) => {
     if (changedPath === REVIEW_EXEMPTIONS_FILE) return false;
-    return exemptions.some((entry) =>
-      entry.endsWith('/') ? changedPath.startsWith(entry) : changedPath === entry
-    );
+    return exemptions.some((entry) => covers(entry, changedPath));
   });
 }
 
@@ -440,9 +480,11 @@ module.exports = {
   areAllChangesReviewExempt,
   calculateDigest,
   classifyPushCommand,
+  covers,
   enforcePushVerdict,
   findCleanVerdict,
   getChangedPaths,
+  loadDistributedPaths,
   loadReviewExemptions,
   resolveLayer,
 };
