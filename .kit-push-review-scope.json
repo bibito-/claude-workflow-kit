@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "review_extra": [
+    {
+      "path": "template/",
+      "reason": "scaffold-template.sh が新規プロジェクトへ一度きりコピーする骨格。マニフェストには載らないが確実に外へ出る。"
+    },
+    {
+      "path": "scripts/",
+      "reason": "scaffold スクリプト本体。コピーはされないが、ここが特定の層を前提にすると、生成される全プロジェクトにそれが焼き付く。"
+    },
+    {
+      "path": "README.md",
+      "reason": "配布はされないが、core と template の切り分け・kit の使い方を定める正典。ここが誤ると以後の判断すべてが誤る。"
+    },
+    {
+      "path": "CLAUDE.md",
+      "reason": "同上。配布ペイロードの境界と禁止事項を定める正典。"
+    },
+    {
+      "path": ".github/",
+      "reason": "ゲート定義そのもの。ここを緩める変更が無審査で通ると、以後の審査すべてが形骸化する。"
+    }
+  ],
+  "no_review": []
+}
