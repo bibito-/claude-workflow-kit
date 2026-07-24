@@ -35,7 +35,7 @@ git -C ../claude-workflow-kit config core.hooksPath .githooks
 - `node .claude/scripts/merge-hook-registrations.cjs` でフックを `settings.json` に登録する（`settings.json` はプロジェクトごとに異なるため配布対象外。不足分だけ追記される）
 - 内容確認のうえ、明示的な `git add` → commit → push（`git add -A` は使わない）
 
-**新規プロジェクトの場合**は続けて template の骨格も取り込める。
+**新規プロジェクトの場合**は続けて template の骨格も取り込める。( stack-kit（Template repository）がまだ存在しない場合 )
 
 ```sh
 ../claude-workflow-kit/scripts/scaffold-template.sh
