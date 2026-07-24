@@ -27,12 +27,11 @@ git -C ../claude-workflow-kit config core.hooksPath .githooks
 ../claude-workflow-kit/scripts/scaffold.sh
 ```
 
-フォルダ構造・`.gitignore`・core ファイル一式を配置し、最後に一覧を報告する。既存ファイルは上書きせずスキップするため、**新規・既存どちらのプロジェクトに対しても安全に実行できる**（冪等・git 操作なし。実行検証の詳細は [docs/scaffold-onboarding.md](docs/scaffold-onboarding.md)）。
+フォルダ構造・`.gitignore`・core ファイル一式を配置し、hooks を `settings.json` へ登録し（不足分だけ追記。`settings.json` 自体は配布対象外）、最後に一覧を報告する。既存ファイルは上書きせずスキップするため、**新規・既存どちらのプロジェクトに対しても安全に実行できる**（冪等・git 操作なし。実行検証の詳細は [docs/scaffold-onboarding.md](docs/scaffold-onboarding.md)）。
 
 レポートに従い残りの手動作業を行う。
 
 - リポジトリ設定「Allow GitHub Actions to create and approve pull requests」の有効化
-- `node .claude/scripts/merge-hook-registrations.cjs` でフックを `settings.json` に登録する（`settings.json` はプロジェクトごとに異なるため配布対象外。不足分だけ追記される）
 - 内容確認のうえ、明示的な `git add` → commit → push（`git add -A` は使わない）
 
 **新規プロジェクトの場合**は続けて template の骨格も取り込める。( stack-kit（Template repository）がまだ存在しない場合 )
