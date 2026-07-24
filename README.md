@@ -2,108 +2,71 @@
 
 Claude Code と協業する TDD・spec/docs・review の開発ワークフロー方法論。スタックに依存しない core 部分のみを収録する。
 
-## 位置づけ
+## これは何か
 
-このワークフローは [ai-todo](https://github.com/bibito-/ai-todo)（Hono + React + Supabase + Cloudflare Workers のプロダクト）で実運用しながら磨いてきたものを抽出したもの。ai-todo は「実際に動かしながら仕組みを改善する実験場」、[hono-auth-starter](https://github.com/bibito-/hono-auth-starter) はそのスタック向けテンプレート、本リポジトリは**スタックを問わず再利用できる部分だけを切り出した core**という3段構成。
+このワークフローは [ai-todo](https://github.com/bibito-/ai-todo)（Hono + React + Supabase + Cloudflare Workers のプロダクト）で実運用しながら磨いてきたものを抽出したもの。
 
-## core / template の切り分け
+- **ai-todo** … 実際に動かしながら仕組みを改善する実験場
+- **[hono-auth-starter](https://github.com/bibito-/hono-auth-starter)** … そのスタック向けテンプレート
+- **本リポジトリ（claude-workflow-kit）** … スタックを問わず再利用できる部分だけを切り出した core
 
-| 種別 | 内容 | 配布方針 |
+## 導入
+
+対象プロジェクトの隣に本リポジトリをクローンする（場所は任意。以降は隣に置いた前提で書く）。
+
+```sh
+gh repo clone bibito-/claude-workflow-kit ../claude-workflow-kit
+git -C ../claude-workflow-kit config core.hooksPath .githooks
+```
+
+2行目は本リポジトリへの push を守るフックを有効にする（詳細: [docs/kit-push-gate.md](docs/kit-push-gate.md)）。
+
+対象プロジェクトの**リポジトリルート**でスキャフォールディングスクリプトを実行する。
+
+```sh
+../claude-workflow-kit/scripts/scaffold.sh
+```
+
+フォルダ構造・`.gitignore`・core ファイル一式を配置し、最後に一覧を報告する。既存ファイルは上書きせずスキップするため、**新規・既存どちらのプロジェクトに対しても安全に実行できる**（冪等・git 操作なし。実行検証の詳細は [docs/scaffold-onboarding.md](docs/scaffold-onboarding.md)）。
+
+レポートに従い残りの手動作業を行う。
+
+- リポジトリ設定「Allow GitHub Actions to create and approve pull requests」の有効化
+- `node .claude/scripts/merge-hook-registrations.cjs` でフックを `settings.json` に登録する（`settings.json` はプロジェクトごとに異なるため配布対象外。不足分だけ追記される）
+- 内容確認のうえ、明示的な `git add` → commit → push（`git add -A` は使わない）
+
+**新規プロジェクトの場合**は続けて template の骨格も取り込める。
+
+```sh
+../claude-workflow-kit/scripts/scaffold-template.sh
+```
+
+impl-agent / review-agent などレイヤー別委譲の TDD 骨格を配置し、Claude Code で `/template-setup` を実行して埋める。既存プロジェクトへの後付けはまだ実証されていない（詳細: [docs/template-scaffold.md](docs/template-scaffold.md)）。
+
+以後の core 更新は日次 CI（pull-check）の PR と `/workflow-kit-pull` で取り込み、プロジェクト側の改善は `/workflow-kit-push` で還流する。
+
+## 配布物
+
+どのファイルが core として配られるかの単一の正は [`.claude/manifests/workflow-kit-files.txt`](.claude/manifests/workflow-kit-files.txt)。大まかには次の3種類に分かれる。
+
+| 種別 | 内容 | 配布 |
 |---|---|---|
-| **core**（本リポジトリの `.claude/` に収録） | 収録一覧の単一の正は [`.claude/manifests/workflow-kit-files.txt`](.claude/manifests/workflow-kit-files.txt)。フック一式（`.claude/hooks/`）・agent（`doc-push-agent`・`kit-push-review-agent`）・rules（`agent-definition-guide`・`commit-guide`・`documentation-guide`・`grill-me`）・docs/rules（`documentation-guide` 全文・`terminology-rules`）・skills（`merge-gate`・`spec-workflow`・`doc-push`・`index-setup`・`workflow-kit-push`・`workflow-kit-pull`）・`commands/spec`・フック登録の配布（`manifests/hook-registrations.json`・`scripts/merge-hook-registrations.cjs`）・マニフェスト自身・`.github/workflows/workflow-kit-pull-check.yml` | 各利用プロジェクトが `workflow-kit-pull-check.yml`（日次 + 手動実行）で本リポジトリとの差分を検知し、自リポジトリへ反映する PR を自動発行する。マージはレビューの上で手動 |
-| **template**（本リポジトリの `template/` に収録） | impl-agent / review-agent / typecheck-agent 定義・`agent-delegation`・`tdd-workflow`・`commands/tdd`。**実物ではなく `{{PLACEHOLDER}}` 入りの骨格**（「形は普遍・中身がスタック依存」なものだけ）。typecheck-agent は型チェッカー名で埋めてリネームする（TypeScript なら `tsc-agent`、Python なら `mypy-agent`。型チェッカーが無いスタックでは削除） | プロジェクト新規作成時に `scripts/scaffold-template.sh` で一度だけ取り込み、`/template-setup` でスタックに合わせて埋める。以後は同期しない（書き換えを上書きしてしまうため）。base SHA もマニフェストも書かないので、構造的に CI の走査対象外になる |
-| **スタック固有 rules**（本リポジトリには非収録） | react/tanstack-query/supabase/ui 等の docs/rules・テストボイラープレートの実物 | 骨格化しても中身が全部消えて空ファイルになるだけなので template に含めない。各プロジェクトが自分のスタックに合わせて書く（kit が渡すのは「rules を `docs/rules/` に置き `INDEX.md` から引く」という置き場のルールだけ） |
-| **派生物**（本リポジトリには非収録） | 各フォルダの `INDEX.md` | フォルダ内容から導出される索引のため、リポジトリごとに内容が異なる。配布せず、各プロジェクトの doc-push フローが自前で生成・更新する（ルール本体は `documentation-guide` が core として配布） |
+| **core**（`.claude/` 配下） | フック・agent・rules・skills・`/spec` コマンドなど | される。各プロジェクトが日次 CI で差分を検知し、取り込み PR を自動発行する |
+| **template**（`template/` 配下） | impl-agent / review-agent など「形は普遍・中身がスタック依存」な骨格 | 新規プロジェクト作成時に一度だけ取り込む。以後同期しない |
+| **設計記録**（`docs/`・`scripts/`・`README.md` など） | このリポジトリ自身の運用・設計文書 | されない |
 
-core と template の境界は、実際に非 Hono スタックのプロジェクトを1つ以上立ち上げて検証してから固める。
-
-### 配布しないもの
-
-| パス | 役割 |
-|---|---|
-| `docs/` | 本リポジトリ自身の設計記録。索引は [docs/INDEX.md](docs/INDEX.md) |
-| `.githooks/` | 本リポジトリへの push を守る Git-level のフック（`pre-push`）。kit ローカルの保護 |
-| `scripts/` | scaffold スクリプト。kit クローンから直接実行する |
-| `.github/workflows/kit-push-guard.yml` | 本リポジトリ自身の CI。`.github/workflows/` 配下でも `workflow-kit-pull-check.yml` は配布物なので、ディレクトリ単位では判断しない |
-| `.claude/settings.json` | 本リポジトリで作業するときの設定。利用プロジェクトごとに permissions・MCP 設定が異なるため配布できない |
-
-`docs/` を `.claude/` 配下ではなくリポジトリ直下に置いているのは、`.claude/` が配布ペイロードの領域だから。そこに非配布物を混ぜると、マニフェストにディレクトリ行を足した瞬間に設計文書まで全 consumer へ配られる。
-
-## core の配布方式
-
-本リポジトリから push するのではなく、**各利用プロジェクトが pull する**。どのファイルを取り込むかは利用プロジェクト側の `.claude/manifests/workflow-kit-files.txt` を単一の正とし、本リポジトリはその参照先として振る舞う。
-
-利用プロジェクト側に必要なもの（`scripts/scaffold.sh` が自動準備する）:
-
-- `.github/workflows/workflow-kit-pull-check.yml`
-- `.claude/manifests/workflow-kit-files.txt`
-- `.claude/manifests/workflow-kit-base.txt`（三方向比較の祖先）
-
-手動設定のまま残るもの:
-
-- リポジトリ設定「Allow GitHub Actions to create and approve pull requests」の有効化。`workflow-kit-pull-check.yml` は kit との差分を検知すると `GITHUB_TOKEN` で取り込み PR を自動生成する。この設定が無効だと PR 生成が失敗し、差分を検知しても取り込み経路が開かない
-
-自動化されたもの:
-
-- `.claude/settings.json` への hooks 登録。settings.json 自体は配布対象外（プロジェクトごとに permissions・MCP 設定が異なるため）だが、pull 時に `.claude/scripts/merge-hook-registrations.cjs` が `.claude/manifests/hook-registrations.json` の宣言を読み、**不足している登録だけを追記する**。既存エントリの変更・削除・並べ替えはせず、プロジェクト独自のフック登録にも触れない
-
-## 導入手順
-
-1. 対象プロジェクトの隣に本リポジトリをクローンし、Git-level のフックを有効化する
-
-   ```sh
-   gh repo clone bibito-/claude-workflow-kit ../claude-workflow-kit
-   git -C ../claude-workflow-kit config core.hooksPath .githooks
-   ```
-
-   2行目は本リポジトリへの push を守る `pre-push` を有効にする（[docs/kit-push-gate.md](docs/kit-push-gate.md)）。`core.hooksPath` はクローンごとのローカル設定なので、クローンするたびに必要。同じ値を設定し直すだけなので冪等。
-
-2. 対象プロジェクトのルートでスキャフォールディングスクリプトを実行する
-
-   ```sh
-   ../claude-workflow-kit/scripts/scaffold.sh
-   ```
-
-   フォルダ構造・`.gitignore` 追記・core ファイル一式・`workflow-kit-base.txt` の初期化を自動準備する。既存ファイルは上書きせずスキップして一覧報告する（冪等・git 操作は一切しない）。
-
-3. レポートに従い残りの手動作業を行う
-
-   - リポジトリ設定「Allow GitHub Actions to create and approve pull requests」の有効化
-   - フック登録の追記
-
-     ```sh
-     node .claude/scripts/merge-hook-registrations.cjs
-     ```
-
-   - 内容確認のうえ明示的な `git add` → commit → push（`git add -A` は使わない）
-
-4. **（新規プロジェクトの場合）template の骨格を取り込む**
-
-   ```sh
-   ../claude-workflow-kit/scripts/scaffold-template.sh
-   ```
-
-   impl-agent / review-agent / typecheck-agent / `agent-delegation` / `tdd-workflow` / `commands/tdd` の骨格と、穴埋め手順書 `/template-setup` を配置する。レポートの末尾に残っているプレースホルダが `ファイル:行:名前` で列挙される。
-
-   続けて Claude Code で `/template-setup` を実行する。レイヤー構成・テストランナーをコードベースから調査し、判断できない点だけ確認したうえで、impl-agent / review-agent をレイヤー数だけ複製してプレースホルダを埋める（完了後、手順書自身は削除される）。
-
-   スクリプトは**配置とレポートしかしない**（対話質問・プレースホルダ置換・git 操作をしない）。レイヤー分割やテスト戦略は業務判断であり、対話プロンプトの選択肢に落とせないため、決定は `/template-setup`（= Claude との対話）が担う。
-
-5. 以後の core 更新は日次 CI（pull-check）の PR と `/workflow-kit-pull` で取り込み、プロジェクト側の改善は `/workflow-kit-push` で還流する。scaffold は一度きりの入口で、以後は既存の同期ループに引き継ぐ。**template は同期ループに乗らない**（骨格は取り込んだ時点でそのプロジェクトの資産になる）
-
-補足:
-
-- テンプレート（hono-auth-starter 等）由来のプロジェクトでも実行して害はない（冪等）。テンプレートに焼き込まれた core が古い場合の補完と、テンプレートに含まれない `workflow-kit-base.txt` の初期化という実益がある
-- **scaffold は「差分ありスキップ」が1件でも残る間は `workflow-kit-base.txt` を書かない（重要）**。差分が残ったまま base（= kit HEAD）を置くと、三方向比較は「base と kit が同一・project だけ違う」を見て、そのファイルを「project 側の意図的な先行変更（local）」と誤分類する。実態は kit に追随できていないだけなのに、以後 kit 側の更新は pull で取り込まれず、CI は「kit へ push してください」という逆向きの notice を出し続ける（要解決として見え続けるのではなく「解決済み・project 優先」として見えなくなるのが危険）。差分を `/workflow-kit-pull` / `/workflow-kit-push` で解決してから base を設定すること
-- `scripts/scaffold.sh`・`scripts/scaffold-template.sh` は kit クローンから直接実行するもので、利用プロジェクトへは配布しない（マニフェスト対象外）
-- `template/` を kit 自身の `.claude/` ではなくリポジトリ直下に置いているのは、両者の区別を manifest の記載有無だけに頼らないため。同居させると pull-check が骨格を core と取り違えうる（利用プロジェクト側の同名ファイルと衝突する形の穴）
+core と template の切り分け方針、スタック固有 rules を配らない理由などは [docs/template-scaffold.md](docs/template-scaffold.md) を参照。
 
 ## push 前の審査
 
-kit への `git push` は `kit-push-review-agent` の clean verdict が無いとフックにブロックされる。審査が走るのは変更が**配布物**に触れたときだけで、アプリのコードや設計アーカイブだけの push では走らない。
+kit への `git push` は `kit-push-review-agent` の clean verdict が無いとフックにブロックされる。審査が走るのは変更が**配布物**に触れたときだけで、設計記録だけの push では走らない。
 
 - 仕組みとスコープの定義: [docs/kit-push-gate.md](docs/kit-push-gate.md)
 - スコープをこう決めた経緯: [docs/ci-review-agent-migration.md](docs/ci-review-agent-migration.md)
+
+## ドキュメント
+
+このリポジトリ自身の設計判断・運用ルールは [docs/](docs/)（索引: [docs/INDEX.md](docs/INDEX.md)）にまとめている。
 
 ## 現状（TODO）
 
