@@ -147,7 +147,29 @@ else
   created+=("$BASE_FILE（kit HEAD: $(git -C "$KIT_ROOT" rev-parse --short HEAD)）")
 fi
 
-# --- Step 7: 最終レポート ---
+# --- Step 7: hooks の settings.json への登録 ---
+#
+# settings.json は core 配布対象外（プロジェクトごとに permissions・MCP 設定が
+# 異なり、上書きすると壊れる）が、登録が無ければフックは一度も発火しない。
+# 発火しないゲートは、無いより悪いため、ここで自動登録する。
+# merge-hook-registrations.cjs 自身が「不足分だけ追記・冪等・想定外の構造なら
+# 書き込まずに exit 1」を保証しているため、ここでの自動実行に追加のリスクはない。
+
+hook_registration=()
+if ! command -v node >/dev/null 2>&1; then
+  hook_registration+=("node が見つからないため自動登録をスキップしました。手動で実行してください: node .claude/scripts/merge-hook-registrations.cjs")
+elif hook_output="$(node .claude/scripts/merge-hook-registrations.cjs 2>&1)"; then
+  while IFS= read -r line; do
+    [ -n "$line" ] && hook_registration+=("$line")
+  done <<<"$hook_output"
+else
+  hook_registration+=("登録に失敗しました。内容を確認のうえ手動で実行してください: node .claude/scripts/merge-hook-registrations.cjs")
+  while IFS= read -r line; do
+    [ -n "$line" ] && hook_registration+=("  $line")
+  done <<<"$hook_output"
+fi
+
+# --- Step 8: 最終レポート ---
 
 report_list() {
   local title="$1"
@@ -167,6 +189,7 @@ report_list "作成" ${created[@]+"${created[@]}"}
 report_list ".gitignore 追記" ${gitignore_added[@]+"${gitignore_added[@]}"}
 report_list "スキップ（kit と同一）" ${skipped_same[@]+"${skipped_same[@]}"}
 report_list "スキップ（差分あり・要手動解決）" ${skipped_diff[@]+"${skipped_diff[@]}"}
+report_list "hooks 登録（settings.json）" ${hook_registration[@]+"${hook_registration[@]}"}
 report_list "補足" ${notes[@]+"${notes[@]}"}
 
 cat <<'EOF'
@@ -175,20 +198,6 @@ cat <<'EOF'
 1. リポジトリ設定「Allow GitHub Actions to create and approve pull requests」を有効化する
    （Settings → Actions → General → Workflow permissions）
 
-2. hooks を発火させるため settings.json に登録する
-
-     node .claude/scripts/merge-hook-registrations.cjs
-
-   settings.json は core 配布対象外（プロジェクトごとに permissions・MCP 設定が
-   異なり、上書きすると壊れる）。しかし登録が無ければフックは一度も発火しない。
-   発火しないゲートは、無いより悪い。
-
-   このスクリプトが hook-registrations.json の宣言を読み、不足している登録だけを
-   settings.json に追記する。既存エントリ・permissions・プロジェクト独自のフック
-   登録には触れない。冪等。
-
-   手で書く必要はない。--check を付けると書き込まず、不足があれば報告する。
-
-3. 配置されたファイルの内容を確認のうえ、コミット対象を明示列挙して git add → commit する
+2. 配置されたファイルの内容を確認のうえ、コミット対象を明示列挙して git add → commit する
    （git add -A は使わない）
 EOF
