@@ -103,7 +103,8 @@ core の [index-setup.md](./index-setup.md) に従い、`.claude/agents/`・`.cl
 | `/workflow-kit-push` | core の改善を claude-workflow-kit へ還流する |
 ```
 
-`/workflow-kit-pull` / `/workflow-kit-push` は core のスキルだが、commands/ 側のエントリは各プロジェクトが作る（`.claude/commands/<name>.md` から対応スキルを読ませる）。
+`/spec`・`/doc-push`・`/workflow-kit-pull`・`/workflow-kit-push` は core が skills/ と commands/ の
+両方を配布するため、ここで作る必要はない（`/tdd` だけが template 側の骨格）。
 
 ## Step 8: このスキルとコマンドを削除して報告する
 
