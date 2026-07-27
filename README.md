@@ -46,13 +46,13 @@ git -C ../claude-workflow-kit config core.hooksPath .githooks
 - リポジトリ設定「Allow GitHub Actions to create and approve pull requests」の有効化
 - 内容確認のうえ、明示的な `git add` → commit → push（`git add -A` は使わない）
 
-**新規プロジェクトの場合**は続けて template の骨格も取り込める。( stack-kit（Template repository）がまだ存在しない場合 )
+続けて template の骨格も取り込める。( stack-kit（Template repository）がまだ存在しない場合 )
 
 ```sh
 ../claude-workflow-kit/scripts/scaffold-template.sh
 ```
 
-impl-agent / review-agent などレイヤー別委譲の TDD 骨格を配置し、Claude Code で `/template-setup` を実行して埋める。既存プロジェクトへの後付けはまだ実証されていない（詳細: [docs/template-scaffold.md](docs/template-scaffold.md)）。
+impl-agent / review-agent などレイヤー別委譲の TDD 骨格を配置し、Claude Code で `/template-setup` を実行して埋める（詳細: [docs/template-scaffold.md](docs/template-scaffold.md)）。
 
 以後の core 更新は日次 CI（pull-check）の PR と `/workflow-kit-pull` で取り込み、プロジェクト側の改善は `/workflow-kit-push` で還流する。
 
