@@ -4,6 +4,20 @@
 
 配布物の設計・実装は**このリポジトリで行う**。利用プロジェクト側で書いて push で還流させる経路（`/workflow-kit-push`）も残しているが、それは「実作業中に気づいた修正」のための副次経路であり、主戦場はここ。
 
+## 用語
+
+| 語 | 指すもの |
+|---|---|
+| **core** | スタック非依存の配布ペイロードそのもの。実体はマニフェスト（`.claude/manifests/workflow-kit-files.txt`）に載っているファイル群 |
+| **kit** | その core を持つ正リポジトリ側。層ごとに存在する（workflow 層の kit = このリポジトリ、stack 層の kit = 別リポジトリ）。`kit-push-guard`・`kit-push-review-agent`・`kit_path` の kit はすべてこの意味 |
+| **利用プロジェクト / 配布先 / consumer** | kit から core を受け取る側。ここを kit とは呼ばない |
+| **層（layer）** | 配布物の抽象度の区分。workflow 層（スタック非依存）・stack 層（特定スタック向け）など。`guard-kit-push-verdict.cjs` の `layer` はこれ |
+| **template** | `template/` に置く骨格。core と違い一度きりの取り込みで、以後同期しない |
+
+pull / push の向きは kit を基準にする。`/workflow-kit-pull` は kit から配布先へ core を取り込む、`/workflow-kit-push` は配布先で書いた core 相当の変更を kit へ還流する。
+
+1つのリポジトリが**配布先でありながら別の層の kit の正を兼ねる**ことがある（例: workflow 層の core を受け取りつつ、stack 層の kit でもあるプロジェクト）。この二重身分のために `/workflow-kit-pull` の Step 6-b が存在する。
+
 ## ディレクトリの役割
 
 | パス | 役割 | 配布 |
