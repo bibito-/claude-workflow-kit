@@ -10,6 +10,18 @@ Claude Code と協業する TDD・spec/docs・review の開発ワークフロー
 - **[hono-auth-starter](https://github.com/bibito-/hono-auth-starter)** … そのスタック向けテンプレート
 - **本リポジトリ（claude-workflow-kit）** … スタックを問わず再利用できる部分だけを切り出した core
 
+## 用語
+
+| 語 | 指すもの |
+|---|---|
+| **core** | スタック非依存の配布ペイロードそのもの。実体は [`.claude/manifests/workflow-kit-files.txt`](.claude/manifests/workflow-kit-files.txt) に載っているファイル群 |
+| **kit** | その core を持つ正リポジトリ側。層ごとに存在する（workflow 層の kit = 本リポジトリ、stack 層の kit = 別リポジトリ） |
+| **利用プロジェクト / 配布先** | kit から core を受け取る側。ここを kit とは呼ばない |
+| **層（layer）** | 配布物の抽象度の区分。workflow 層（スタック非依存）・stack 層（特定スタック向け）など |
+| **template** | `template/` に置く骨格。core と違い取り込みは一度きりで、以後同期しない |
+
+pull / push の向きは kit を基準にする。`/workflow-kit-pull` は kit から配布先へ core を取り込み、`/workflow-kit-push` は配布先で書いた core 相当の変更を kit へ還流する。1つのリポジトリが配布先でありながら別の層の kit を兼ねることもある。
+
 ## 導入
 
 対象プロジェクトの隣に本リポジトリをクローンする（場所は任意。以降は隣に置いた前提で書く）。
