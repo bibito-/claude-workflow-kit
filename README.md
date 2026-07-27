@@ -79,14 +79,3 @@ kit への `git push` は `kit-push-review-agent` の clean verdict が無いと
 
 このリポジトリ自身の設計判断・運用ルールは [docs/](docs/)（索引: [docs/INDEX.md](docs/INDEX.md)）にまとめている。
 
-## 現状（TODO）
-
-- [x] core ファイルの移設
-- [x] core の CI/PR 自動配布（pull 型・`workflow-kit-pull-check.yml`）
-- [x] スキャフォールディングスクリプト（core 前提条件の準備・`scripts/scaffold.sh`）
-- [x] スキャフォールディングスクリプト（template 取り込み用・`scripts/scaffold-template.sh` + `/template-setup`）
-- [x] 本リポジトリへの push を PR 経路へ統一し、CI で鮮度（base トレーラ）と混入を検査する（[docs/kit-push-guard-ci.md](docs/kit-push-guard-ci.md)）
-- [x] push 前の混入審査を専任 agent に委譲し、フックで強制する（[docs/kit-push-gate.md](docs/kit-push-gate.md)）
-- [x] フック登録を配布物にして、pull 時に `settings.json` へマージする
-- [x] 審査対象を「変更 ∩ 審査スコープ」に絞り、配布物に触れない push から審査を外す
-- [ ] 非 Hono スタックのプロジェクトで core / template の境界を実地検証する
